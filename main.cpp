@@ -2,6 +2,7 @@
 #include <fstream>
 #include <vector>
 #include <ctime>
+#include <memory>
 #include "json.hpp"
 #include "car.hpp"
 using std::string;
@@ -11,6 +12,11 @@ using std::ifstream;
 using std::ofstream;
 using std::endl;
 using std::vector;
+using std::unique_ptr;
+using std::make_unique;
+using std::find;
+using std::begin;
+using std::end;
 using json = nlohmann::json;
 class Rental{
     unsigned short int customer_id;
@@ -19,88 +25,169 @@ class Rental{
     time_t end_rent;
 };
 
-void modify_car(string cars_file, vector<Car*>& cars){
+void modify_car(string cars_file, vector<unique_ptr<Car>>& cars) {
     ifstream input_stream(cars_file);
-    if (!input_stream){
+    if (!input_stream) {
         cout << "Error: Unable to open the file!" << endl;
         return;
     }
+
+    // Read the existing data from the JSON file
     json carsData;
     input_stream >> carsData;
     input_stream.close();
 
+    // Prompt the user for the number plate of the car they wish to modify
     string number_plate;
-    cout << "Please choose number plate of a car to modify: ";
+    cout << "Please enter the number plate of the car to modify: ";
     cin >> number_plate;
 
-    bool car_found = false;
-
-
-    for (auto& car : carsData["cars"]){
-        if (car["number_plate"] == number_plate){
-            car_found = true;
-            int choice;
-            cout << "What do you want to modify?" << endl;
-            cout << "1. Brand" << endl;
-            cout << "2. Model" << endl;
-            cout << "3. Year" << endl;
-            cout << "4. Availability" << endl;
-            cout << "5. Daily Price" << endl;
-
-            cout << "Enter your choice: ";
-            cin >> choice;
-
-            switch (choice) {
-                case 1: {
-                    string new_brand;
-                    cout << "Enter new brand: ";
-                    cin >> new_brand;
-                    car["brand"] = new_brand;
-                    break;
-                }
-                case 2: {
-                    string new_model;
-                    cout << "Enter new model: ";
-                    cin >> new_model;
-                    car["model"] = new_model;
-                    break;
-                }
-                case 3: {
-                    int new_year;
-                    cout << "Enter new year: ";
-                    cin >> new_year;
-                    car["year"] = new_year;
-                    break;
-                }
-                case 4: {
-                    bool new_availability;
-                    cout << "Enter availability (1 for true, 0 for false): ";
-                    cin >> new_availability;
-                    car["available"] = new_availability;
-                    break;
-                }
-                case 5: {
-                    double new_price;
-                    cout << "Enter new daily price: ";
-                    cin >> new_price;
-                    car["day_price"] = new_price;
-                    break;
-                }
-                default:
-                    cout << "Invalid choice!" << endl;
-                    return;
-            }
-
-            cout << "Car details updated successfully!" << endl;
+    // Iterate over the cars vector and search for the car with the specified number plate
+    unique_ptr<Car>* car_to_modify = nullptr;
+    for (auto& car : cars) {
+        if (car->getNumberPlate() == number_plate) {
+            car_to_modify = &car;  
             break;
         }
     }
-    if (!car_found){
-        cout << "Invalid number plate!";
+
+    // Check if the car was found
+    if (car_to_modify == nullptr) {
+        cout << "Error: Car with number plate " << number_plate << " not found!" << endl;
+        return;
     }
-    
+
+    int choice = -1;
+    while (choice != 0) {
+        // Display modification menu
+        cout << "What would you like to modify?\n"
+             << "1. Brand\n"
+             << "2. Model\n"
+             << "3. Year\n"
+             << "4. Availability\n"
+             << "5. Daily Price\n"
+             << "0. Exit\n"
+             << "Enter your choice: ";
+        cin >> choice;
+
+        // Handle the user's choice
+        switch (choice) {
+            case 1: {
+                string new_brand;
+                cout << "Enter new brand: ";
+                cin >> new_brand;
+                (*car_to_modify)->setBrand(new_brand);
+                break;
+            }
+            case 2: {
+                string new_model;
+                cout << "Enter new model: ";
+                cin >> new_model;
+                (*car_to_modify)->setModel(new_model);
+                break;
+            }
+            case 3: {
+                int new_year;
+                cout << "Enter new year: ";
+                cin >> new_year;
+                (*car_to_modify)->setYear(new_year);
+                break;
+            }
+            case 4: {
+                bool new_availability;
+                cout << "Enter availability (1 for available, 0 for not available): ";
+                cin >> new_availability;
+                (*car_to_modify)->setAvailability(new_availability);
+                break;
+            }
+            case 5: {
+                double new_price;
+                cout << "Enter new daily price: ";
+                cin >> new_price;
+                (*car_to_modify)->setDayPrice(new_price);
+                break;
+            }
+            case 0:
+                cout << "Exiting modification menu.\n";
+                break;
+            default:
+                cout << "Invalid choice. Please try again.\n";
+        }
+    }
+
+    // update the JSON file
+    for (auto& car_data : carsData["cars"]) {
+        if (car_data["number_plate"] == number_plate) {
+            car_data["brand"] = (*car_to_modify)->getBrand();
+            car_data["model"] = (*car_to_modify)->getModel();
+            car_data["year"] = (*car_to_modify)->getYear();
+            car_data["available"] = (*car_to_modify)->isAvailable();
+            car_data["day_price"] = (*car_to_modify)->getDayPrice();
+            break; 
+        }
+    }
+
     ofstream output_file(cars_file);
-    if (output_file){
+    if (output_file) {
+        output_file << carsData.dump(4);
+        cout << "Changes saved to the file successfully!" << endl;
+    } else {
+        cout << "Cannot write changes to the file!" << endl;
+    }
+}
+// update the function for unique_ptr use
+void remove_car(string cars_file, vector<unique_ptr<Car>>& cars) {
+    // Open the JSON file to read the current cars data
+    ifstream input_stream(cars_file);
+    if (!input_stream) {
+        cout << "Error: Unable to open the file!" << endl;
+        return;
+    }
+
+    json carsData;
+    input_stream >> carsData;  // Read the existing data from the file
+    input_stream.close();
+
+    // Ask the user for the number plate of the car they want to remove
+    string number_plate;
+    cout << "Please enter the number plate of the car to remove: ";
+    cin >> number_plate;
+
+    // Search for the car in the vector using a simple for loop
+    auto it = cars.begin();
+    while (it != cars.end()) {
+        if ((*it)->getNumberPlate() == number_plate) {
+            it = cars.erase(it); 
+            cout << "Car with number plate " << number_plate << " has been removed." << endl;
+            break;
+        } else {
+            ++it;
+        }
+    }
+
+
+    if (it == cars.end()) {
+        cout << "Error: Car with number plate " << number_plate << " not found!" << endl;
+        return;
+    }
+
+    // Update JSON
+    bool car_removed = false;
+    for (auto it = carsData["cars"].begin(); it != carsData["cars"].end(); ++it) {
+        if ((*it)["number_plate"] == number_plate) {
+            it = carsData["cars"].erase(it);
+            car_removed = true;
+            break;
+        }
+    }
+
+    if (!car_removed) {
+        cout << "Error: Car with number plate " << number_plate << " not found in the data file!" << endl;
+        return;
+    }
+
+    ofstream output_file(cars_file);
+    if (output_file) {
         output_file << carsData.dump(4);
         cout << "Changes saved to the file successfully!" << endl;
     } else {
@@ -108,51 +195,8 @@ void modify_car(string cars_file, vector<Car*>& cars){
     }
 }
 
-void remove_car(string cars_file, vector<Car*>& cars) {
-    ifstream input_stream(cars_file);
 
-    if (!input_stream) {
-        cout << "Error: Unable to open the file!" << endl;
-        return;
-    }
-
-    json carsData;
-    input_stream >> carsData;
-    input_stream.close();
-
-    string delete_record;
-    cout << "Please enter the number plate of the car to delete: ";
-    cin >> delete_record;
-
-    bool found = false;
-
-    // Create a new array excluding the car to delete
-    json updatedCars = json::array();
-    for (const auto& item : carsData["cars"]) {
-        if (item["number_plate"].get<std::string>() == delete_record) {
-            found = true; // Mark that we've found the car to delete
-        } else {
-            updatedCars.push_back(item); // Keep the other cars
-        }
-    }
-
-    if (!found) {
-        cout << "No car found with the given number plate." << endl;
-        return;
-    }
-
-    // Update JSON and write back to the file
-    carsData["cars"] = updatedCars;
-    ofstream output_stream(cars_file);
-    if (output_stream) {
-        output_stream << carsData.dump(4);
-        cout << "Car with number plate " << delete_record << " has been removed successfully!" << endl;
-    } else {
-        cout << "Error: Unable to write to the file!" << endl;
-    }
-}
-
-void add_car(string cars_file, vector<Car*>& cars ){
+void add_car(string cars_file, vector<unique_ptr<Car>>& cars ){
     unsigned char electric;
     string number_plate, brand, model;
     int year;
@@ -186,23 +230,18 @@ void add_car(string cars_file, vector<Car*>& cars ){
     newCar["year"] = year;
     newCar["available"] = available;
     newCar["day_price"] = day_price;
-
-    Car* car = nullptr;
     if (electric == 'y' or electric == 'Y') {
         cout << "Kms: ";
         cin >> kms;
         cout << endl;
+        cars.push_back(make_unique<ElectricCar>(number_plate, brand, model, year, available, day_price, kms));
         newCar["type"] = "ElectricCar";
         newCar["kilometers"] = kms;
-
-        car = new ElectricCar(number_plate, brand, model, year, available, day_price, kms);
-
     } else {
-        newCar["type"] = "Car";
-        car = new Car(number_plate, brand, model, year, available, day_price);
-    }
+        cars.push_back(make_unique<Car>(number_plate, brand, model, year, available, day_price));
 
-    cars.push_back(car);
+        newCar["type"] = "Car";
+    }
 
     json carsData;
     ifstream input_file(cars_file);
@@ -210,12 +249,15 @@ void add_car(string cars_file, vector<Car*>& cars ){
         input_file >> carsData;
     }
     input_file.close();
+
+
     carsData["cars"].push_back(newCar);
+
+
     ofstream output_file(cars_file);
     if (output_file){
         output_file << carsData.dump(4);
-        cout << "New car entry added: ";
-        cout << car << endl;
+        cout << "New car entry added!";
     } else {
         cout << "Unable to locate the file to write the new entry!" << endl;
     }
@@ -249,13 +291,13 @@ int menu_customer(){
     return choice;
 }
 
-void display_cars(const vector<Car*>& cars){
+void display_cars(const vector<unique_ptr<Car>>& cars){
     for (auto& car : cars){
         car->display();
     }
 }
 
-void car_records(string cars_file, vector<Car*>& cars){
+void car_records(string cars_file, vector<unique_ptr<Car>>& cars){
     // create an input file stream object
     ifstream input_stream(cars_file);
     
@@ -277,9 +319,9 @@ void car_records(string cars_file, vector<Car*>& cars){
     */
     for (const auto& item : carsData["cars"]){
         if (item["type"] == "Car"){
-            cars.push_back(new Car(item["number_plate"], item["brand"], item["model"], item["year"], item["available"], item["day_price"]));
+            cars.push_back(make_unique<Car>(item["number_plate"], item["brand"], item["model"], item["year"], item["available"], item["day_price"]));
         } else if (item["type"] == "ElectricCar") {
-            cars.push_back(new ElectricCar(item["number_plate"], item["brand"], item["model"], item["year"], item["available"], item["day_price"], item["kilometers"]));
+            cars.push_back(make_unique<ElectricCar>(item["number_plate"], item["brand"], item["model"], item["year"], item["available"], item["day_price"], item["kilometers"]));
         }
     }
 }
@@ -298,7 +340,7 @@ int main() {
     string rent_file = "D:\\Studies\\c++\\rent.json";
     
     // initialize a polymorphic vector to store all the cars
-    vector<Car*> cars;
+    vector<unique_ptr<Car>> cars;
 
     car_records(cars_file, cars);
     
@@ -334,9 +376,6 @@ int main() {
                 break;
             case 0:
                 cout << "Thank you for using our car rental software! See ya:)" << endl;
-                for (auto& car : cars) {
-                    delete car;
-                }
                 return 0;
 
             default:
