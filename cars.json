@@ -1,0 +1,23 @@
+{
+    "cars": [
+        {
+            "available": true,
+            "brand": "Peugeot",
+            "day_price": 14.4829,
+            "model": "306",
+            "number_plate": "SOMETHING",
+            "type": "Car",
+            "year": 2015
+        },
+        {
+            "available": false,
+            "brand": "Tesla",
+            "day_price": 243.2424,
+            "kilometers": 190000,
+            "model": "Model 3",
+            "number_plate": "FORTNITE",
+            "type": "ElectricCar",
+            "year": 2018
+        }
+    ]
+}
