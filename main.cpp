@@ -1,10 +1,13 @@
 #include <iostream>
+#include <map>
+#include <set>
 #include <fstream>
 #include <vector>
 #include <ctime>
 #include <memory>
 #include "json.hpp"
 #include "car.hpp"
+#include "rent.hpp"
 using std::string;
 using std::cout;
 using std::cin;
@@ -17,13 +20,10 @@ using std::make_unique;
 using std::find;
 using std::begin;
 using std::end;
+using std::map;
+using std::set;
 using json = nlohmann::json;
-class Rental{
-    unsigned short int customer_id;
-    string number_plate;
-    time_t start_rent;
-    time_t end_rent;
-};
+
 
 void modify_car(string cars_file, vector<unique_ptr<Car>>& cars) {
     ifstream input_stream(cars_file);
@@ -153,7 +153,7 @@ void remove_car(string cars_file, vector<unique_ptr<Car>>& cars) {
     cout << "Please enter the number plate of the car to remove: ";
     cin >> number_plate;
 
-    // Search for the car in the vector using a simple for loop
+    // Search for the car in the vector using for loop
     auto it = cars.begin();
     while (it != cars.end()) {
         if ((*it)->getNumberPlate() == number_plate) {
@@ -194,7 +194,6 @@ void remove_car(string cars_file, vector<unique_ptr<Car>>& cars) {
         cout << "Cannot write changes to the file!" << endl;
     }
 }
-
 
 void add_car(string cars_file, vector<unique_ptr<Car>>& cars ){
     unsigned char electric;
@@ -265,13 +264,12 @@ void add_car(string cars_file, vector<unique_ptr<Car>>& cars ){
 
 int menu_admin(){
     int choice;
-    cout << "1. Rented Cars"<< endl; 
+    cout << "1. Show Rent Records"<< endl; 
 	cout << "2. New Car"<< endl;
 	cout << "3. Modify Car"<< endl;
 	cout << "4. Remove Car"<< endl;
 	cout << "5. Show All Cars"<< endl;
-	cout << "6. Change Rent Records"<< endl;
-	cout << "7. Show Rent Records"<< endl;
+	cout << "6. Save Rent Records"<< endl;
 	cout << "0. Exit"<< endl;
 	cout << "--- Choose any one option ---" << endl;
 	cout << "Enter one option: ";
@@ -283,7 +281,6 @@ int menu_customer(){
     int choice;
     cout << "1. Rent a Car" << endl;
     cout << "2. Return a Car" << endl;
-    cout << "3. Show My History" << endl;
     cout << "0. Exit" << endl;
     cout << "--- Choose any one option ---" << endl;
 	cout << "Enter one option: ";
@@ -326,6 +323,24 @@ void car_records(string cars_file, vector<unique_ptr<Car>>& cars){
     }
 }
 
+void customer_records(string customers_file, vector<unique_ptr<Customer>>& customers){
+    ifstream input_stream(customers_file);
+
+    if(!input_stream){
+        cout << "Error opening customers file!" << endl;
+        return;
+    }
+
+    json customersData;
+    input_stream >> customersData;
+    input_stream.close();
+
+    for (const auto& item : customersData){
+        customers.push_back(make_unique<Customer>(item["name"], item["email"], item["phone"]));
+    } 
+}
+
+
 unsigned char home(){
     unsigned char mode;
     cout << "Please choose a mode (a-admin, c-customer): ";
@@ -335,56 +350,89 @@ unsigned char home(){
 
 
 int main() {
-    int something;
-    string cars_file = "D:\\Studies\\c++\\cars.json";
-    string rent_file = "D:\\Studies\\c++\\rent.json";
-    
-    // initialize a polymorphic vector to store all the cars
+    string cars_file = "D:\\Studies\\c++\\Project data\\cars.json";
+    string rent_file = "D:\\Studies\\c++\\Project data\\rent.json";
+    string customers_file = "D:\\Studies\\c++\\Project data\\customers.json";
+
+    // Load cars from the file
     vector<unique_ptr<Car>> cars;
-
     car_records(cars_file, cars);
-    
 
+    // Load Customers from the file
+    vector<unique_ptr<Customer>> customers;
+    customer_records(customers_file, customers);
+
+    RentalSystem rentalSystem;
+
+    // Load rentals from the file
+    rentalSystem.loadRentals(rent_file);
+    
     unsigned char mode = home();
 
-    
-    
-
-    while(true){
-        something = menu_admin();
-        switch (something) {
-            case 1:
-                cout << "Number 1 was chosen" << endl;
-                break;
-            case 2:
-                cout << "You chose to add new car!" << endl;
-                add_car(cars_file, cars);
-                break;
-            case 3:
-                cout << "You chose to modify existing cars!" << endl;
-                display_cars(cars);
-                modify_car(cars_file, cars);
-                break;
-            case 4:
-                cout << "You chose to remove a car!" << endl;
-                cout << "Existing cars: " << endl;
-                display_cars(cars);
-                remove_car(cars_file, cars);
-                break;
-            case 5:
-                display_cars(cars);
-                break;
-            case 0:
-                cout << "Thank you for using our car rental software! See ya:)" << endl;
-                return 0;
-
-            default:
-                cout << "Please, enter a valid choice! Don't play with this software, please:(" << endl;
-                break;
+    while (true) {
+        if (mode == 'a' || mode == 'A') {
+            int adminChoice = menu_admin();
+            switch (adminChoice) {
+                case 1:
+                    rentalSystem.displayRentals();
+                    break;
+                case 2:
+                    cout << "Adding a new car...\n";
+                    add_car(cars_file, cars);
+                    break;
+                case 3:
+                    cout << "Modifying an existing car...\n";
+                    modify_car(cars_file, cars);
+                    break;
+                case 4:
+                    cout << "Removing a car...\n";
+                    remove_car(cars_file, cars);
+                    break;
+                case 5:
+                    display_cars(cars);
+                    break;
+                case 6:
+                    rentalSystem.saveRentals(rent_file);
+                    break;
+                case 0:
+                    cout << "Exiting...\n";
+                    return 0;
+                default:
+                    cout << "Invalid choice. Please try again.\n";
+            }
+        } else if (mode == 'c' || mode == 'C') {
+            string customerName, carNumberPlate, startRent, endRent;
+            int customerChoice = menu_customer();
+            switch (customerChoice) {
+                case 1:
+                    cout << "Enter your name: ";
+                    cin >> customerName;
+                    cout << "Enter car number plate: ";
+                    cin >> carNumberPlate;
+                    cout << "Enter start date (YYYY-MM-DD): ";
+                    cin >> startRent;
+                    cout << "Enter end date (YYYY-MM-DD): ";
+                    cin >> endRent;
+                    rentalSystem.rentCar(cars, customers, customerName, carNumberPlate, startRent, endRent);
+                    rentalSystem.saveRentals(rent_file);
+                    break;
+                case 2:
+                    cout << "Enter car number plate to return: ";
+                    cin >> carNumberPlate;
+                    rentalSystem.returnCar(cars, carNumberPlate);
+                    rentalSystem.saveRentals(rent_file);
+                    break;
+                case 0:
+                    cout << "Exiting customer mode...\n";
+                    return 0;
+                default:
+                    cout << "Invalid choice. Please try again.\n";
+            }
+        } else {
+            cout << "Invalid mode. Please choose again.\n";
         }
-        
-        
     }
+    return 0;
     
 }
 

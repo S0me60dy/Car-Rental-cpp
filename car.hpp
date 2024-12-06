@@ -22,7 +22,7 @@ class Car {
         // use of virtual function to "allow" polymorphism
         virtual void display() const {
         cout << "Car: " << number_plate << ", " << brand << " " << model << ", Year: " << year
-             << ", Available: " << available << ", Day Price: $" << day_price << endl;
+            << ", Available: " << available << ", Day Price: $" << day_price << endl;
         }
         // definition of an automatic virtual destructor to prevent leaks
         virtual ~Car() = default;

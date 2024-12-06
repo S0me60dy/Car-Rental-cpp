@@ -18,6 +18,15 @@
             "number_plate": "FORTNITE",
             "type": "ElectricCar",
             "year": 2018
+        },
+        {
+            "available": true,
+            "brand": "WWWW",
+            "day_price": 10.2,
+            "model": "WW",
+            "number_plate": "WOOORDIO",
+            "type": "Car",
+            "year": 2022
         }
     ]
 }
